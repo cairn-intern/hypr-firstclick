@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git g++ make pkg-config binutils file \
+            hyprland-dev libpixman-1-dev libdrm-dev libpango1.0-dev \
+            libinput-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build plugin
+        run: make
+
+      - name: Verify plugin exports
+        run: |
+          test -f firstclick.so
+          file firstclick.so
+          nm -D firstclick.so | grep -E ' T (pluginAPIVersion|pluginInit|pluginExit)$'
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firstclick.so
+          path: firstclick.so
