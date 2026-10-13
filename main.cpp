@@ -6,6 +6,8 @@
 #include <any>
 #include <set>
 
+#include <linux/input-event-codes.h>
+
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
@@ -36,7 +38,7 @@ static bool anyModifierDown() {
     return false;
 }
 
-static void onMouseButton(void* self, SCallbackInfo& info, std::any data) {
+static void onMouseButton([[maybe_unused]] void* self, SCallbackInfo& info, std::any data) {
     if (!enabled())
         return;
 
@@ -47,8 +49,7 @@ static void onMouseButton(void* self, SCallbackInfo& info, std::any data) {
         return;
     }
 
-    // BTN_LEFT / BTN_RIGHT / BTN_MIDDLE only.
-    if (event.button < 272 || event.button > 274)
+    if (event.button != BTN_LEFT && event.button != BTN_RIGHT && event.button != BTN_MIDDLE)
         return;
 
     if (event.state == WL_POINTER_BUTTON_STATE_RELEASED) {
