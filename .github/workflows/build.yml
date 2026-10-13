@@ -21,16 +21,17 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
       - name: Install build dependencies
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git g++ make pkg-config binutils file \
+            ca-certificates git g++ make pkg-config binutils file \
             hyprland-dev libpixman-1-dev libdrm-dev libpango1.0-dev \
             libinput-dev libudev-dev libwayland-dev libxkbcommon-dev
-
-      - name: Check out source
-        uses: actions/checkout@v4
+          update-ca-certificates
 
       - name: Build plugin
         run: make
