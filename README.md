@@ -47,3 +47,7 @@ hyprctl plugin list
 ```
 
 A Hyprland upgrade breaks the plugin until it is rebuilt against the new headers. That is normal for Hyprland plugins.
+
+## License
+
+Copyright © 2026 euxaristia. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.

@@ -1,3 +1,6 @@
+// Copyright © 2026 euxaristia
+// SPDX-License-Identifier: Apache-2.0
+
 #define WLR_USE_UNSTABLE
 
 #include <any>
