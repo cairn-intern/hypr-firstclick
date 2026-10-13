@@ -29,7 +29,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates git g++ make pkg-config binutils file \
-            hyprland-dev libpixman-1-dev libdrm-dev libpango1.0-dev \
+            hyprland-dev libpixman-1-dev libdrm-dev libpango1.0-dev libegl-dev libgles2-mesa-dev \
             libinput-dev libudev-dev libwayland-dev libxkbcommon-dev
           update-ca-certificates
 
