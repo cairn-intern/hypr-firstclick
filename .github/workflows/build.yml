@@ -17,21 +17,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:26.04
+      image: archlinux:latest
     env:
-      DEBIAN_FRONTEND: noninteractive
+      # The plugin targets the Hyprland 0.56 API, which the Ubuntu
+      # hyprland-dev package (0.53.3) predates. Arch ships current
+      # Hyprland, and its package archive can be frozen to a date, so the
+      # whole package repo is pinned to the snapshot that carries
+      # Hyprland 0.56.2. When porting the plugin to a newer Hyprland,
+      # bump ARCHIVE_DATE to a snapshot carrying it and set
+      # HYPRLAND_VERSION to match; the verify step below fails loudly if
+      # the two ever disagree.
+      ARCHIVE_DATE: '2026/10/14'
+      HYPRLAND_VERSION: '0.56.2'
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Pin the package archive
+        run: |
+          echo "Server = https://archive.archlinux.org/repos/${ARCHIVE_DATE}/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
+          pacman -Syu --noconfirm
+
       - name: Install build dependencies
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates git g++ make pkg-config binutils file \
-            hyprland-dev libpixman-1-dev libdrm-dev libpango1.0-dev libegl-dev libgles2-mesa-dev \
-            libinput-dev libudev-dev libwayland-dev libxkbcommon-dev
-          update-ca-certificates
+          pacman -S --noconfirm --needed \
+            gcc make pkgconf binutils file \
+            hyprland pixman libdrm pango libglvnd libinput systemd-libs wayland libxkbcommon
+
+      - name: Verify the pinned Hyprland version
+        run: |
+          installed="$(pkg-config --modversion hyprland)"
+          echo "Hyprland headers: ${installed} (workflow pins ${HYPRLAND_VERSION})"
+          test "${installed}" = "${HYPRLAND_VERSION}"
 
       - name: Build plugin
         run: make
