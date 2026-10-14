@@ -15,6 +15,9 @@
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
 
+#include <hyprland/src/event/EventBus.hpp>
+#include <hyprland/src/desktop/state/ViewState.hpp>
+
 // macOS-style click-to-focus: the first click on an unfocused window only
 // focuses it. The click is not delivered to the window, so it cannot press
 // buttons, follow links, or place a cursor by accident. The matching release
@@ -22,15 +25,20 @@
 
 inline HANDLE PHANDLE = nullptr;
 
-static SP<HOOK_CALLBACK_FN> g_mouseHook;
-static std::set<uint32_t>   g_swallowedButtons;
+static CHyprSignalListener g_mouseHook;
+static std::set<uint32_t>  g_swallowedButtons;
 
 static bool enabled() {
-    static auto* const* PENABLED = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:firstclick:enabled")->getDataStaticPtr();
-    return **PENABLED != 0;
+    static auto val = HyprlandAPI::getConfigValue(PHANDLE, "plugin:firstclick:enabled");
+    if (!val)
+        return true;
+    static auto* const* PENABLED = (Hyprlang::INT* const*)val->getDataStaticPtr();
+    return PENABLED && *PENABLED && **PENABLED != 0;
 }
 
 static bool anyModifierDown() {
+    if (!g_pInputManager)
+        return false;
     for (const auto& kb : g_pInputManager->m_keyboards) {
         if (kb && kb->getModifiers() != 0)
             return true;
@@ -38,16 +46,9 @@ static bool anyModifierDown() {
     return false;
 }
 
-static void onMouseButton([[maybe_unused]] void* self, SCallbackInfo& info, std::any data) {
+static void onMouseButton(const IPointer::SButtonEvent& event, Event::SCallbackInfo& info) {
     if (!enabled())
         return;
-
-    IPointer::SButtonEvent event;
-    try {
-        event = std::any_cast<IPointer::SButtonEvent>(data);
-    } catch (...) {
-        return;
-    }
 
     if (event.button != BTN_LEFT && event.button != BTN_RIGHT && event.button != BTN_MIDDLE)
         return;
@@ -63,8 +64,11 @@ static void onMouseButton([[maybe_unused]] void* self, SCallbackInfo& info, std:
     if (anyModifierDown())
         return;
 
-    const auto TARGET = g_pCompositor->vectorToWindowUnified(g_pInputManager->getMouseCoordsInternal(),
-                                                              Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING);
+    if (!Desktop::viewState() || !Desktop::focusState() || !g_pInputManager)
+        return;
+
+    const auto TARGET = Desktop::viewState()->hitTest().windowAt(g_pInputManager->getMouseCoordsInternal(),
+                                                                  Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING);
     if (!TARGET)
         return;
 
@@ -72,7 +76,7 @@ static void onMouseButton([[maybe_unused]] void* self, SCallbackInfo& info, std:
         return;
 
     g_swallowedButtons.insert(event.button);
-    Desktop::focusState()->fullWindowFocus(TARGET);
+    Desktop::focusState()->fullWindowFocus(TARGET, Desktop::FOCUS_REASON_CLICK);
     // Cancelling the button skips Hyprland's normal pointer refocus, which
     // leaves the cursor without a surface and it disappears. Resync it.
     g_pInputManager->refocus();
@@ -96,13 +100,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:firstclick:enabled", Hyprlang::INT{1});
 
-    g_mouseHook = HyprlandAPI::registerCallbackDynamic(PHANDLE, "mouseButton", ::onMouseButton);
-    if (!g_mouseHook) {
-        HyprlandAPI::addNotification(PHANDLE, "[firstclick] Failed to register mouseButton hook", CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
-        throw std::runtime_error("[firstclick] Failed to register mouseButton hook");
-    }
-
-    HyprlandAPI::reloadConfig();
+    g_mouseHook = Event::bus()->m_events.input.mouse.button.listen([](IPointer::SButtonEvent event, Event::SCallbackInfo& info) {
+        onMouseButton(event, info);
+    });
 
     return {"firstclick", "First click on an unfocused window only focuses it", "euxaristia", "1.0"};
 }
